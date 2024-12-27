@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Meme Token Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background: #0d1117; 
+            color: #fff; 
+        }
+        .nav-custom {
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+        }
+        .token-card {
+            background: #161b22;
+            border-radius: 16px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #30363d;
+            transition: all 0.3s ease;
+        }
+        .token-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .wallet-info {
+            background: #21262d;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 12px;
+            border: 1px solid #30363d;
+        }
+        .token-stats {
+            background: #21262d;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .address-text {
+            color: #58a6ff;
+            font-family: monospace;
+        }
+        .price-info {
+            font-size: 24px;
+            color: #3fb950;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar nav-custom mb-4">
+        <div class="container">
+            <a class="navbar-brand text-white" href="#">🚀 Meme Token Platform</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>🚀 Meme Token Platform</h1>
+            <div class="wallet-section">
+                <button id="connect-wallet" class="btn btn-primary">
+                    Connect Pera Wallet
+                </button>
+                <span id="wallet-address" class="badge bg-success ms-2 d-none"></span>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <!-- Existing Token Card Content -->
+                <!-- Replace this comment with your dynamic content generation code -->
+                {% for islem in islemler %}
+                <div class="token-card">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h3 class="m-0">{{ islem.token_adi }}</h3>
+                        <div class="price-info">+{{ "{:.1f}".format((islem.dolasim_arzi/islem.toplam_arz)*100) }}%</div>
+                    </div>
+                    
+                    <div class="token-stats">
+                        <div class="row">
+                            <div class="col-6">
+                                <p class="text-muted mb-1">Token ID</p>
+                                <p class="mb-3">{{ islem.token_id }}</p>
+                                <p class="text-muted mb-1">Toplam Arz</p>
+                                <p>{{ "{:,}".format(islem.toplam_arz) }}</p>
+                            </div>
+                            <div class="col-6">
+                                <p class="text-muted mb-1">Oluşturulma</p>
+                                <p class="mb-3">{{ islem.islem_zamani.split("T")[0] }}</p>
+                                <p class="text-muted mb-1">Dolaşım</p>
+                                <p>{{ "{:,}".format(islem.dolasim_arzi) }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h5 class="mt-4 mb-3">Cüzdan Dağılımı</h5>
+                    {% for cuzdan in islem.cuzdan_listesi %}
+                    <div class="wallet-info">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="address-text">{{ cuzdan.address[:10] }}...{{ cuzdan.address[-5:] }}</span>
+                            <span>{{ "{:,}".format(cuzdan.balance) }} token</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="col-md-4">
+                <div class="token-card">
+                    <h4>Token İstatistikleri</h4>
+                    <div class="mt-3" style="height: 300px;">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">24s Hacim</span>
+                            <span>$123,456</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Market Değeri</span>
+                            <span>$789,012</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Toplam İşlem</span>
+                            <span>1,234</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { connectWallet, peraWallet } from '/static/js/wallet.js';
+
+        document.getElementById('connect-wallet').addEventListener('click', async () => {
+            try {
+                const address = await connectWallet();
+                if (address) {
+                    document.getElementById('wallet-address').textContent = 
+                        `${address.slice(0,4)}...${address.slice(-4)}`;
+                    document.getElementById('wallet-address').classList.remove('d-none');
+                    document.getElementById('connect-wallet').classList.add('d-none');
+                }
+            } catch (error) {
+                console.error('Wallet connection error:', error);
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initWebSocket();
+            initPriceChart();
+        });
+
+        function initWebSocket() {
+            const ws = new WebSocket('ws://127.0.0.1:5001/ws');
+            
+            ws.onopen = () => {
+                console.log('WebSocket bağlantısı kuruldu');
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Veri alındı:', data);
+                
+                if (data.type === 'price_update') {
+                    updateChart(data.data);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket hatası:', error);
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket bağlantısı kapandı');
+                setTimeout(initWebSocket, 3000);
+            };
+        }
+
+        function initPriceChart() {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Token Değeri',
+                        data: [],
+                        borderColor: '#3fb950',
+                        tension: 0.4,
+                        fill: true,
+                        backgroundColor: 'rgba(63, 185, 80, 0.1)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#21262d',
+                            borderColor: '#30363d',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' }
+                        },
+                        x: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(data) {
+            if (!priceChart) return;
+            
+            const time = new Date(data.timestamp).toLocaleTimeString();
+            priceChart.data.labels.push(time);
+            priceChart.data.datasets[0].data.push(data.price);
+            
+            if (priceChart.data.labels.length > 10) {
+                priceChart.data.labels.shift();
+                priceChart.data.datasets[0].data.shift();
+            }
+            
+            priceChart.update();
+        }
+    </script>
+</body>
+</html>
